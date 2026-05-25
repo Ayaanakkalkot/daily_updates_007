@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { useUser } from "@/hooks/useUser";
 
 export default function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
+  const user = useUser();
 
   if (pathname === "/login") return null;
 
@@ -21,7 +23,12 @@ export default function NavBar() {
         <Link href="/" className="text-sm font-semibold text-white tracking-tight hover:text-indigo-400 transition-colors">
           Daily Updates
         </Link>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {user && (
+            <span className="text-xs text-gray-600 px-3 py-1.5">
+              {user.displayName}
+            </span>
+          )}
           <Link href="/" className="text-xs text-gray-500 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/[0.06]">
             Today
           </Link>

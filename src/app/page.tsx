@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, KeyboardEvent } from "react";
+import { useUser } from "@/hooks/useUser";
 
 const TODAY = new Date().toISOString().split("T")[0];
 
@@ -19,6 +20,7 @@ export default function TodayPage() {
   const [status, setStatus] = useState<"idle" | "loading" | "saving" | "saved" | "error">("loading");
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const user = useUser();
 
   useEffect(() => {
     fetch(`/api/updates/${TODAY}`)
@@ -77,8 +79,11 @@ export default function TodayPage() {
         <div className="mb-10">
           <p className="text-xs font-medium tracking-widest text-indigo-400 uppercase mb-2">Daily Log</p>
           <h1 className="text-3xl font-semibold text-white leading-tight">
-            {formatDate(TODAY)}
+            {user ? `Welcome back, ${user.displayName}` : formatDate(TODAY)}
           </h1>
+          {user && (
+            <p className="text-gray-500 text-sm mt-1">{formatDate(TODAY)}</p>
+          )}
         </div>
 
         {/* Card */}
