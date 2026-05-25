@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SignJWT } from "jose";
+import { createHmac, randomBytes } from "crypto";
 
-const SECRET = new TextEncoder().encode("zintlr-daily-updates-jwt-secret-2026");
+const SECRET = "zintlr-daily-updates-jwt-secret-2026";
 
 const USERS: Record<string, string> = {
   "yashwanth.a@zintlr.com": "arvan123",
   "ayaan.a@zintlr.com": "ayaan123",
 };
+
+function makeToken(username: string): string {
+  const payload = Buffer.from(JSON.stringify({ username, exp: Date.now() + 30 * 24 * 60 * 60 * 1000 })).toString("base64url");
+  const sig = createHmac("sha256", SECRET).update(payload).digest("base64url");
+  return `${payload}.${sig}`;
+}
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
@@ -15,11 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  const token = await new SignJWT({ username })
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("30d")
-    .sign(SECRET);
-
+  const token = makeToken(username);
   const res = NextResponse.json({ ok: true });
   res.cookies.set("auth_token", token, {
     httpOnly: true,

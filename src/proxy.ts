@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
+import { createHmac } from "crypto";
 
-const SECRET = new TextEncoder().encode("zintlr-daily-updates-jwt-secret-2026");
+const SECRET = "zintlr-daily-updates-jwt-secret-2026";
+
+function verifyToken(token: string): { username: string } | null {
+  try {
+    const [payload, sig] = token.split(".");
+    if (!payload || !sig) return null;
+    const expected = createHmac("sha256", SECRET).update(payload).digest("base64url");
+    if (expected !== sig) return null;
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString());
+    if (data.exp < Date.now()) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -11,18 +25,16 @@ export async function proxy(req: NextRequest) {
   }
 
   const token = req.cookies.get("auth_token")?.value;
-  if (!token) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
+  if (!token) return NextResponse.redirect(new URL("/login", req.url));
 
-  try {
-    await jwtVerify(token, SECRET);
-    return NextResponse.next();
-  } catch {
+  const data = verifyToken(token);
+  if (!data) {
     const res = NextResponse.redirect(new URL("/login", req.url));
     res.cookies.delete("auth_token");
     return res;
   }
+
+  return NextResponse.next();
 }
 
 export const config = {
