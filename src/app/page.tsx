@@ -1,65 +1,170 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect, useRef, KeyboardEvent } from "react";
+
+const TODAY = new Date().toISOString().split("T")[0];
+
+function formatDate(d: string) {
+  return new Date(d + "T12:00:00").toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export default function TodayPage() {
+  const [points, setPoints] = useState<string[]>([]);
+  const [input, setInput] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "saving" | "saved" | "error">("loading");
+  const [error, setError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch(`/api/updates/${TODAY}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.points) setPoints(data.points);
+        setStatus("idle");
+      })
+      .catch(() => setStatus("idle"));
+  }, []);
+
+  const addPoint = () => {
+    const val = input.trim();
+    if (!val) return;
+    const next = [...points, val];
+    setPoints(next);
+    setInput("");
+    autosave(next);
+    inputRef.current?.focus();
+  };
+
+  const removePoint = (i: number) => {
+    const next = points.filter((_, idx) => idx !== i);
+    setPoints(next);
+    autosave(next);
+  };
+
+  const autosave = async (pts: string[]) => {
+    setStatus("saving");
+    setError("");
+    try {
+      const res = await fetch(`/api/updates/${TODAY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ points: pts }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Save failed");
+      }
+      setStatus("saved");
+    } catch (e: unknown) {
+      setStatus("error");
+      setError(e instanceof Error ? e.message : "Unknown error");
+    }
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") addPoint();
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen bg-[#0f0f13] flex items-start justify-center px-4 py-14">
+      <div className="w-full max-w-xl">
+        {/* Header */}
+        <div className="mb-10">
+          <p className="text-xs font-medium tracking-widest text-indigo-400 uppercase mb-2">Daily Log</p>
+          <h1 className="text-3xl font-semibold text-white leading-tight">
+            {formatDate(TODAY)}
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Card */}
+        <div className="bg-[#16161d] border border-white/[0.06] rounded-2xl shadow-2xl overflow-hidden">
+
+          {/* Points list */}
+          <div className="px-6 pt-6 pb-4 min-h-[180px]">
+            {status === "loading" ? (
+              <div className="flex gap-2 items-center text-gray-600 text-sm py-8 justify-center">
+                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
+                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse delay-75" />
+                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse delay-150" />
+              </div>
+            ) : points.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <div className="w-10 h-10 rounded-full bg-white/[0.04] flex items-center justify-center mb-3">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <p className="text-gray-600 text-sm">No points yet. Add what you did today.</p>
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {points.map((pt, i) => (
+                  <li key={i} className="group flex items-start gap-3 py-2 px-3 rounded-xl hover:bg-white/[0.04] transition-colors">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                    <span className="flex-1 text-[0.9rem] text-gray-200 leading-relaxed">{pt}</span>
+                    <button
+                      onClick={() => removePoint(i)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-red-400 mt-0.5"
+                      aria-label="Remove"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-white/[0.05] mx-6" />
+
+          {/* Input row */}
+          <div className="px-6 py-4 flex items-center gap-3">
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="What did you work on today?"
+              autoFocus
+              className="flex-1 bg-transparent text-gray-100 text-sm placeholder-gray-600 outline-none"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <button
+              onClick={addPoint}
+              disabled={!input.trim()}
+              className="shrink-0 w-8 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+            >
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Status bar */}
+          <div className="px-6 py-3 bg-white/[0.02] border-t border-white/[0.04] flex items-center justify-between">
+            <span className="text-xs text-gray-600">
+              {points.length} {points.length === 1 ? "point" : "points"} logged
+            </span>
+            <span className="text-xs">
+              {status === "saving" && <span className="text-indigo-400">Saving…</span>}
+              {status === "saved" && <span className="text-emerald-400">Saved</span>}
+              {status === "error" && <span className="text-red-400">{error}</span>}
+            </span>
+          </div>
         </div>
-      </main>
+
+        {/* Hint */}
+        <p className="text-center text-xs text-gray-700 mt-6">
+          Press <kbd className="px-1.5 py-0.5 bg-white/[0.06] rounded text-gray-500 font-mono">Enter</kbd> to add a point
+        </p>
+      </div>
     </div>
   );
 }
