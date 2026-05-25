@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 
 const SECRET = new TextEncoder().encode("zintlr-daily-updates-jwt-secret-2026");
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (pathname.startsWith("/api/auth") || pathname.startsWith("/_next") || pathname === "/login") {
